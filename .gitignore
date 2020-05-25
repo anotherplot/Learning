@@ -106,3 +106,4 @@ project.lock.json
 
 # Rider
 .idea/
+/rmqtest.csproj

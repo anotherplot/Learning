@@ -17,19 +17,13 @@ namespace rmqtest
             var receivedMessages = new List<string>();
             var expectedMessages = new List<string> {"The quick brown fox", "jumps over", "the lazy dog"};
 
-            var factory = new ConnectionFactory() {HostName = "localhost"};
-
+            var factory = new ConnectionFactory();
             var connection = factory.CreateConnection();
-
+            
             var model = connection.CreateModel();
             model.QueueDeclare(queueName, true, false, false, null);
-            model.BasicQos(prefetchSize: 0, prefetchCount: 1, global: false);
 
             var consumer = new EventingBasicConsumer(model);
-            model.BasicConsume(queue: queueName, autoAck: false, consumer: consumer);
-
-            PublishMessages(exchangeName, model, queueName);
-
             consumer.Received += (sender, ea) =>
             {
                 var body = ea.Body.Span;
@@ -39,8 +33,10 @@ namespace rmqtest
                 model.BasicAck(ea.DeliveryTag, false);
             };
 
-            string consumerTag = model.BasicConsume(queueName, false, consumer);
+            model.BasicConsume(queue: queueName, autoAck: false, consumer: consumer);
 
+            PublishMessages(exchangeName, model, queueName);
+            
             connection.Close();
             
             try

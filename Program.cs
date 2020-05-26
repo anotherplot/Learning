@@ -14,7 +14,7 @@ namespace rmqtest
         {
             var queueName = "testQueue";
             var exchangeName = String.Empty;
-            var messages = new List<string>();
+            var receivedMessages = new List<string>();
             var expectedMessages = new List<string> {"The quick brown fox", "jumps over", "the lazy dog"};
 
             var factory = new ConnectionFactory() {HostName = "localhost"};
@@ -33,9 +33,9 @@ namespace rmqtest
             consumer.Received += (sender, ea) =>
             {
                 var body = ea.Body.Span;
-                var message = Encoding.UTF8.GetString(body);
-                messages.Add(message);
-                Console.WriteLine($"Received: {message}");
+                var receivedMessage = Encoding.UTF8.GetString(body);
+                receivedMessages.Add(receivedMessage);
+                Console.WriteLine($"Received: {receivedMessage}");
                 model.BasicAck(ea.DeliveryTag, false);
             };
 
@@ -45,7 +45,7 @@ namespace rmqtest
             
             try
             {
-                if (!expectedMessages.SequenceEqual(messages))
+                if (!expectedMessages.SequenceEqual(receivedMessages))
                     throw new ArgumentException("Received messages are not as expected");
             }
             catch (Exception e)

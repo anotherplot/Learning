@@ -12,52 +12,67 @@ namespace rmqtest
     {
         static void Main(string[] args)
         {
-            var queueName = "testQueue";
-            var exchangeName = String.Empty;
-            var receivedMessages = new List<string>();
-            var expectedMessages = new List<string> {"The quick brown fox", "jumps over", "the lazy dog"};
+            var adminConsumerMessages = new List<string>();
+            var trackerConsumerMessages = new List<string>();
+            var siteConsumerMessages = new List<string>();
+            var cashierConsumerMessages = new List<string>();
+            string messageToSend = "message";
 
             var factory = new ConnectionFactory();
             var connection = factory.CreateConnection();
-            
             var model = connection.CreateModel();
-            model.QueueDeclare(queueName, true, false, false, null);
 
+            StartConsuming(model, trackerConsumerMessages, "tracker_queue");
+            StartConsuming(model, siteConsumerMessages, "site_queue");
+            StartConsuming(model, cashierConsumerMessages, "cashier_queue");
+            StartConsuming(model, adminConsumerMessages, "admin_queue");
+
+            PublishMessages("In", model);
+            connection.Close();
+
+            AssertReceivedMessages(cashierConsumerMessages, adminConsumerMessages, siteConsumerMessages,
+                trackerConsumerMessages);
+
+            void PublishMessages(string exchangeName, IModel model)
+            {
+                model.BasicPublish(exchangeName, "new_order", null, Encoding.UTF8.GetBytes(messageToSend));
+                Thread.Sleep(500);
+                model.BasicPublish(exchangeName, "order_cancelled", null, Encoding.UTF8.GetBytes(messageToSend));
+                Thread.Sleep(500);
+                model.BasicPublish(exchangeName, "client_verified", null, Encoding.UTF8.GetBytes(messageToSend));
+                Thread.Sleep(500);
+
+                Thread.Sleep(1000);
+            }
+        }
+
+        private static void StartConsuming(IModel model, List<string> receivedMessages, string queueName)
+        {
             var consumer = new EventingBasicConsumer(model);
             consumer.Received += (sender, ea) =>
             {
                 var body = ea.Body.Span;
                 var receivedMessage = Encoding.UTF8.GetString(body);
                 receivedMessages.Add(receivedMessage);
-                Console.WriteLine($"Received: {receivedMessage}");
                 model.BasicAck(ea.DeliveryTag, false);
             };
-
             model.BasicConsume(queue: queueName, autoAck: false, consumer: consumer);
+        }
 
-            PublishMessages(exchangeName, model, queueName);
-            
-            connection.Close();
-            
+        private static void AssertReceivedMessages(List<string> cashierConsumerMessages,
+            List<string> adminConsumerMessages,
+            List<string> siteConsumerMessages, List<string> trackerConsumerMessages)
+        {
             try
             {
-                if (!expectedMessages.SequenceEqual(receivedMessages))
-                    throw new ArgumentException("Received messages are not as expected");
+                if (cashierConsumerMessages.Count != 3 || adminConsumerMessages.Count != 1 ||
+                    siteConsumerMessages.Count != 3 ||
+                    trackerConsumerMessages.Count != 2)
+                    throw new ArgumentException("Consumers received wrong number of messages");
             }
             catch (Exception e)
             {
                 Console.WriteLine(e);
-            }
-
-            void PublishMessages(string exchangeName, IModel model, string queueName)
-            {
-                foreach (var message in expectedMessages)
-                {
-                    model.BasicPublish(exchangeName, queueName, null, Encoding.UTF8.GetBytes(message));
-                    Thread.Sleep(500);
-                }
-
-                Thread.Sleep(1000);
             }
         }
     }
